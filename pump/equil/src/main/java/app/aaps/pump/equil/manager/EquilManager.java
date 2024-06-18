@@ -26,6 +26,8 @@ import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import app.aaps.core.data.model.BS;
+import app.aaps.core.data.pump.defs.PumpType;
 import app.aaps.core.interfaces.logging.AAPSLogger;
 import app.aaps.core.interfaces.logging.LTag;
 import app.aaps.core.interfaces.notifications.Notification;
@@ -34,15 +36,14 @@ import app.aaps.core.interfaces.profile.Profile;
 import app.aaps.core.interfaces.pump.DetailedBolusInfo;
 import app.aaps.core.interfaces.pump.PumpEnactResult;
 import app.aaps.core.interfaces.pump.PumpSync;
-import app.aaps.core.interfaces.pump.defs.PumpType;
 import app.aaps.core.interfaces.resources.ResourceHelper;
 import app.aaps.core.interfaces.rx.bus.RxBus;
 import app.aaps.core.interfaces.rx.events.Event;
 import app.aaps.core.interfaces.rx.events.EventDismissNotification;
+import app.aaps.core.interfaces.rx.events.EventNewNotification;
 import app.aaps.core.interfaces.rx.events.EventOverviewBolusProgress;
 import app.aaps.core.interfaces.sharedPreferences.SP;
 import app.aaps.core.interfaces.utils.HardLimits;
-import app.aaps.core.main.events.EventNewNotification;
 import app.aaps.pump.equil.EquilConst;
 import app.aaps.pump.equil.R;
 import app.aaps.pump.equil.ble.EquilBLE;
@@ -78,7 +79,6 @@ import dagger.android.HasAndroidInjector;
 
 @Singleton
 public class EquilManager {
-    private final HasAndroidInjector injector;
     private final AAPSLogger aapsLogger;
     private final RxBus rxBus;
     private final ResourceHelper rh;
@@ -100,7 +100,6 @@ public class EquilManager {
 
     @Inject
     public EquilManager(
-            HasAndroidInjector injector,
             AAPSLogger aapsLogger,
             RxBus rxBus,
             SP sp,
@@ -111,7 +110,6 @@ public class EquilManager {
             EquilHistoryPumpDao equilHistoryPumpDao,
             Instantiator instantiator
     ) {
-        this.injector = injector;
         this.aapsLogger = aapsLogger;
         this.rxBus = rxBus;
         this.sp = sp;
@@ -158,7 +156,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult closeBle() {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             equilBLE.disconnect();
         } catch (Exception ex) {
@@ -168,7 +166,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult readStatus() {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             equilBLE.getEquilStatus();
         } catch (Exception ex) {
@@ -178,7 +176,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult getTempBasalPump() {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             CmdTempBasalGet command = new CmdTempBasalGet();
             command.setEquilManager(this);
@@ -197,7 +195,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult setTempBasal(double insulin, int time, boolean cancel) {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             CmdTempBasalSet command = new CmdTempBasalSet(insulin, time);
             command.setCancel(cancel);
@@ -246,7 +244,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult setExtendedBolus(double insulin, int time, boolean cancel) {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             CmdExtendedBolusSet command = new CmdExtendedBolusSet(insulin, time, cancel);
             EquilHistoryRecord equilHistoryRecord = addHistory(command);
@@ -295,8 +293,8 @@ public class EquilManager {
         EventOverviewBolusProgress progressUpdateEvent = EventOverviewBolusProgress.INSTANCE;
         progressUpdateEvent.setT(new EventOverviewBolusProgress.Treatment(HardLimits.MAX_IOB_LGS, 0,
                 detailedBolusInfo.getBolusType() ==
-                        DetailedBolusInfo.BolusType.SMB, detailedBolusInfo.getId()));
-        PumpEnactResult result = new PumpEnactResult(injector);
+                        BS.Type.SMB, detailedBolusInfo.getId()));
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             CmdLargeBasalSet command = new CmdLargeBasalSet(detailedBolusInfo.insulin);
             EquilHistoryRecord equilHistoryRecord = addHistory(command);
@@ -354,7 +352,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult stopBolus(BolusProfile bolusProfile) {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             BaseCmd command = new CmdLargeBasalSet(0);
             EquilHistoryRecord equilHistoryRecord = addHistory(command);
@@ -411,7 +409,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult getBasal(Profile profile) {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             CmdBasalGet cmdBasalGet = new CmdBasalGet(profile);
             cmdBasalGet.setEquilManager(this);
@@ -488,7 +486,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult readEquilStatus() {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             BaseCmd command = new CmdModelGet();
             command.setEquilManager(this);
@@ -511,7 +509,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult loadEquilHistory() {
-        PumpEnactResult pumpEnactResult = new PumpEnactResult(injector);
+        PumpEnactResult pumpEnactResult = instantiator.providePumpEnactResult();
         int startIndex;
         startIndex = getStartHistoryIndex();
         int index = getHistoryIndex();
@@ -539,7 +537,7 @@ public class EquilManager {
     }
 
     public PumpEnactResult executeCmd(BaseCmd command) {
-        PumpEnactResult result = new PumpEnactResult(injector);
+        PumpEnactResult result = instantiator.providePumpEnactResult();
         try {
             EquilHistoryRecord equilHistoryRecord = addHistory(command);
             command.setEquilManager(this);

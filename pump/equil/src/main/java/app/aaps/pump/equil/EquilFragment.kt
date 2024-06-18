@@ -2,7 +2,6 @@ package app.aaps.pump.equil
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -11,7 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
-import app.aaps.core.interfaces.extensions.runOnUiThread
+import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.logging.UserEntryLogger
@@ -26,9 +25,9 @@ import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventPumpStatusChanged
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
-import app.aaps.core.interfaces.utils.T
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.ui.UIRunnable
+import app.aaps.core.ui.extensions.runOnUiThread
 import app.aaps.core.ui.toast.ToastUtils
 import app.aaps.pump.equil.data.RunMode
 import app.aaps.pump.equil.databinding.EquilFraBinding
@@ -143,7 +142,7 @@ class EquilFragment : DaggerFragment() {
 
             binding.timeDevice.text = dateUtil.dateAndTimeAndSecondsString(equilManager.lastDataTime)
             val runMode = equilManager.runMode
-            binding.mode.setTextColor(Color.WHITE)
+            binding.mode.setTextColor(rh.gac(app.aaps.core.ui.R.attr.defaultTextColor))
             if (equilManager.isActivationCompleted) {
                 when (runMode) {
                     RunMode.RUN     -> {
@@ -174,7 +173,7 @@ class EquilFragment : DaggerFragment() {
                 binding.btnResumeDelivery.visibility = View.GONE
                 binding.btnSuspendDelivery.visibility = View.GONE
                 binding.mode.text = rh.gs(R.string.equil_init_insulin_error)
-                binding.mode.setTextColor(Color.RED)
+                binding.mode.setTextColor(rh.gac(app.aaps.core.ui.R.attr.warningColor))
             }
 
             binding.serialNumber.text = devName

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:validate="http://schemas.android.com/apk/res-auto">
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory
         android:key="equil"
@@ -25,15 +24,9 @@
             android:key="@string/key_equil_tone"
             android:title="@string/equil_tone" />
 
-        <app.aaps.core.validators.ValidatingEditTextPreference
-            android:defaultValue="10"
-            android:inputType="number"
+        <app.aaps.core.validators.AdaptiveDoublePreference
             android:key="@string/key_equil_maxbolus"
-            android:title="@string/max_bolus_title"
-            validate:floatmaxNumber="25"
-            validate:floatminNumber="0.1"
-            validate:testType="floatNumericRange" />
-
+            android:title="@string/max_bolus_title" />
     </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>

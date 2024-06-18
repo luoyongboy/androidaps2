@@ -1,12 +1,12 @@
 package info.nightscout.pump.medtrum
 
-import app.aaps.core.main.extensions.pureProfileFromJson
-import app.aaps.core.main.profile.ProfileSealed
-import app.aaps.core.interfaces.pump.DetailedBolusInfo
+import app.aaps.core.data.model.TE
+import app.aaps.core.data.pump.defs.PumpType
+import app.aaps.core.data.time.T
 import app.aaps.core.interfaces.pump.PumpSync
-import app.aaps.core.interfaces.pump.defs.PumpType
 import app.aaps.core.interfaces.rx.events.EventOverviewBolusProgress
-import app.aaps.core.interfaces.utils.T
+import app.aaps.core.objects.extensions.pureProfileFromJson
+import app.aaps.core.objects.profile.ProfileSealed
 import com.google.common.truth.Truth.assertThat
 import info.nightscout.pump.medtrum.comm.enums.BasalType
 import info.nightscout.pump.medtrum.comm.enums.ModelType
@@ -37,7 +37,7 @@ class MedtrumPumpTest : MedtrumTestBase() {
             "\"basal\":[{\"time\":\"00:00\",\"value\":\"2.1\"},{\"time\":\"04:00\",\"value\":\"1.9\"},{\"time\":\"06:00\",\"value\":\"1.7\"}," +
             "{\"time\":\"08:00\",\"value\":\"1.5\"},{\"time\":\"16:00\",\"value\":\"1.6\"},{\"time\":\"21:00\",\"value\":\"1.7\"},{\"time\":\"23:00\",\"value\":\"2\"}]," +
             "\"target_low\":[{\"time\":\"00:00\",\"value\":\"4.5\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"7\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}"
-        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!)
+        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!, activePlugin)
 
         // Call
         val result = medtrumPump.buildMedtrumProfileArray(profile)
@@ -55,7 +55,7 @@ class MedtrumPumpTest : MedtrumTestBase() {
             "\"sens\":[{\"time\":\"00:00\",\"value\":\"3\"},{\"time\":\"02:00\",\"value\":\"3.4\"}],\"timezone\":\"UTC\"," +
             "\"basal\":[{\"time\":\"00:00\",\"value\":\"600\"}]," +
             "\"target_low\":[{\"time\":\"00:00\",\"value\":\"4.5\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"7\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}"
-        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!)
+        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!, activePlugin)
 
         // Call
         val result = medtrumPump.buildMedtrumProfileArray(profile)
@@ -79,7 +79,7 @@ class MedtrumPumpTest : MedtrumTestBase() {
             "\"basal\":[{\"time\":\"00:00\",\"value\":\"2.1\"},{\"time\":\"04:00\",\"value\":\"1.9\"},{\"time\":\"06:00\",\"value\":\"1.7\"}," +
             "{\"time\":\"08:00\",\"value\":\"1.5\"},{\"time\":\"16:00\",\"value\":\"1.6\"},{\"time\":\"21:00\",\"value\":\"1.7\"},{\"time\":\"23:00\",\"value\":\"2\"}]," +
             "\"target_low\":[{\"time\":\"00:00\",\"value\":\"4.5\"}],\"target_high\":[{\"time\":\"00:00\",\"value\":\"7\"}],\"startDate\":\"1970-01-01T00:00:00.000Z\",\"units\":\"mmol\"}"
-        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!)
+        val profile = ProfileSealed.Pure(pureProfileFromJson(JSONObject(profileJSON), dateUtil)!!, activePlugin)
         val profileArray = medtrumPump.buildMedtrumProfileArray(profile)
 
         val localDate = LocalDate.of(2023, 1, 1)
@@ -732,7 +732,7 @@ class MedtrumPumpTest : MedtrumTestBase() {
         // Expected values
         Mockito.verify(pumpSync, Mockito.times(1)).insertTherapyEventIfNewWithTimestamp(
             newStartTime,
-            DetailedBolusInfo.EventType.CANNULA_CHANGE,
+            TE.Type.CANNULA_CHANGE,
             null,
             null,
             medtrumPump.pumpType(),
@@ -741,7 +741,7 @@ class MedtrumPumpTest : MedtrumTestBase() {
 
         Mockito.verify(pumpSync, Mockito.times(1)).insertTherapyEventIfNewWithTimestamp(
             newStartTime,
-            DetailedBolusInfo.EventType.INSULIN_CHANGE,
+            TE.Type.INSULIN_CHANGE,
             null,
             null,
             medtrumPump.pumpType(),

@@ -12,12 +12,12 @@ import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import app.aaps.core.interfaces.extensions.toVisibility
+import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.plugin.ActivePlugin
+import app.aaps.core.interfaces.profile.ProfileUtil
 import app.aaps.core.interfaces.pump.BlePreCheck
-import app.aaps.core.interfaces.pump.defs.PumpType
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.AapsSchedulers
@@ -26,6 +26,7 @@ import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.ui.activities.TranslatedDaggerAppCompatActivity
+import app.aaps.core.ui.extensions.toVisibility
 import app.aaps.pump.equil.EquilPumpPlugin
 import app.aaps.pump.equil.R
 import app.aaps.pump.equil.database.EquilHistoryPump
@@ -39,7 +40,6 @@ import app.aaps.pump.equil.events.EventEquilDataChanged
 import app.aaps.pump.equil.manager.Utils
 import app.aaps.pump.equil.manager.command.PumpEvent
 import com.google.android.material.tabs.TabLayout
-import info.nightscout.pump.common.utils.ProfileUtil
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
 import java.text.SimpleDateFormat
@@ -63,6 +63,7 @@ class EquilHistoryRecordActivity : TranslatedDaggerAppCompatActivity() {
     @Inject lateinit var commandQueue: CommandQueue
     @Inject lateinit var fabricPrivacy: FabricPrivacy
     @Inject lateinit var equilPumpPlugin: EquilPumpPlugin
+    @Inject lateinit var profileUtil: ProfileUtil
     @Inject lateinit var rxBus: RxBus
     @Inject lateinit var dateUtil: DateUtil
 
@@ -87,7 +88,7 @@ class EquilHistoryRecordActivity : TranslatedDaggerAppCompatActivity() {
         supportActionBar?.setDisplayShowHomeEnabled(true)
         loadData()
 
-        recyclerViewAdapter = RecyclerViewAdapter(filteredHistoryList, rh)
+        recyclerViewAdapter = RecyclerViewAdapter(filteredHistoryList, rh, profileUtil)
         llm = LinearLayoutManager(this)
         binding.recyclerview.run {
             setHasFixedSize(true)
@@ -270,7 +271,8 @@ class EquilHistoryRecordActivity : TranslatedDaggerAppCompatActivity() {
 
     class RecyclerViewAdapter internal constructor(
         var historyList: List<EquilHistoryRecord>,
-        private val rh: ResourceHelper
+        private val rh: ResourceHelper,
+        private val profileUtil: ProfileUtil
     ) : RecyclerView.Adapter<RecyclerViewAdapter.HistoryViewHolder>() {
 
         override fun onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): HistoryViewHolder {
@@ -321,7 +323,7 @@ class EquilHistoryRecordActivity : TranslatedDaggerAppCompatActivity() {
 
                 EquilHistoryRecord.EventType.EQUIL_ALARM         -> item.note
 
-                EquilHistoryRecord.EventType.SET_BASAL_PROFILE   -> ProfileUtil.getBasalProfilesDisplayable(item.basalValuesRecord!!.segments.toTypedArray(), PumpType.EQUIL)
+                EquilHistoryRecord.EventType.SET_BASAL_PROFILE   -> profileUtil.getBasalProfilesDisplayable(item.basalValuesRecord!!.segments.toTypedArray(), PumpType.EQUIL)
 
                 else                                             -> rh.gs(R.string.equil_success)
             }

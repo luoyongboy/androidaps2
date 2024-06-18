@@ -4,11 +4,16 @@ import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
 import android.text.format.DateFormat
+import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.data.pump.defs.ManufacturerType
+import app.aaps.core.data.pump.defs.PumpDescription
+import app.aaps.core.data.pump.defs.PumpType
+import app.aaps.core.data.pump.defs.TimeChangeType
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.objects.Instantiator
 import app.aaps.core.interfaces.plugin.PluginDescription
-import app.aaps.core.interfaces.plugin.PluginType
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
 import app.aaps.core.interfaces.pump.Pump
@@ -16,9 +21,8 @@ import app.aaps.core.interfaces.pump.PumpEnactResult
 import app.aaps.core.interfaces.pump.PumpPluginBase
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.pump.PumpSync.TemporaryBasalType
-import app.aaps.core.interfaces.pump.defs.ManufacturerType
-import app.aaps.core.interfaces.pump.defs.PumpDescription
-import app.aaps.core.interfaces.pump.defs.PumpType
+import app.aaps.core.interfaces.pump.defs.determineCorrectBasalSize
+import app.aaps.core.interfaces.pump.defs.fillFor
 import app.aaps.core.interfaces.queue.Callback
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.queue.CustomCommand
@@ -29,8 +33,9 @@ import app.aaps.core.interfaces.rx.events.EventPreferenceChange
 import app.aaps.core.interfaces.sharedPreferences.SP
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
-import app.aaps.core.interfaces.utils.TimeChangeType
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.Preferences
 import app.aaps.core.ui.toast.ToastUtils
 import app.aaps.pump.equil.data.AlarmMode
 import app.aaps.pump.equil.data.BolusProfile
@@ -46,7 +51,6 @@ import app.aaps.pump.equil.manager.command.CmdSettingSet
 import app.aaps.pump.equil.manager.command.CmdStatusGet
 import app.aaps.pump.equil.manager.command.CmdTimeSet
 import app.aaps.pump.equil.manager.command.PumpEvent
-import dagger.android.HasAndroidInjector
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.plusAssign
 import org.joda.time.DateTime
@@ -57,7 +61,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton class EquilPumpPlugin @Inject constructor(
-    injector: HasAndroidInjector,
     aapsLogger: AAPSLogger,
     rh: ResourceHelper,
     commandQueue: CommandQueue,
@@ -69,7 +72,9 @@ import javax.inject.Singleton
     private val dateUtil: DateUtil,
     private val pumpSync: PumpSync,
     private val equilManager: EquilManager,
-    private val decimalFormatter: DecimalFormatter
+    private val decimalFormatter: DecimalFormatter,
+    private val instantiator: Instantiator,
+    private val preferences: Preferences
 ) : PumpPluginBase(
     PluginDescription()
         .mainType(PluginType.PUMP)
@@ -78,7 +83,7 @@ import javax.inject.Singleton
         .pluginName(R.string.equil_name)
         .shortName(R.string.equil_name_short)
         .preferencesId(R.xml.pref_equil)
-        .description(R.string.equil_pump_description), injector, aapsLogger, rh, commandQueue
+        .description(R.string.equil_pump_description), aapsLogger, rh, commandQueue
 ), Pump {
 
     override val pumpDescription: PumpDescription
@@ -107,8 +112,8 @@ import javax.inject.Singleton
                                        else ToastUtils.infoToast(context, rh.gs(R.string.equil_error))
                                    }
                                })
-                           } else if (event.isChanged(rh.gs(R.string.key_equil_maxbolus))) {
-                               val data = sp.getDouble(R.string.key_equil_maxbolus, 10.0)
+                           } else if (event.isChanged(rh.gs(app.aaps.core.keys.R.string.key_equil_maxbolus))) {
+                               val data = preferences.get(DoubleKey.EquilMaxBolus)
                                commandQueue.customCommand(CmdSettingSet(data), object : Callback() {
                                    override fun run() {
                                        if (result.success) ToastUtils.infoToast(context, rh.gs(R.string.equil_pump_updated))
@@ -122,7 +127,7 @@ import javax.inject.Singleton
     var tempActivationProgress = ActivationProgress.NONE
 
     init {
-        pumpDescription = PumpDescription(pumpType)
+        pumpDescription = PumpDescription().fillFor(pumpType)
         statusChecker = Runnable {
             if (commandQueue.size() == 0 && commandQueue.performing() == null) {
                 if (equilManager.isActivationCompleted) commandQueue.customCommand(CmdStatusGet(), null)
@@ -168,7 +173,7 @@ import javax.inject.Singleton
             }
             return pumpEnactResult
         }
-        return PumpEnactResult(injector).enacted(false).success(false).comment(rh.gs(R.string.equil_pump_not_run))
+        return instantiator.providePumpEnactResult().enacted(false).success(false).comment(rh.gs(R.string.equil_pump_not_run))
     }
 
     override fun isThisProfileSet(profile: Profile): Boolean {
@@ -195,22 +200,22 @@ import javax.inject.Singleton
         if (detailedBolusInfo.insulin == 0.0) {
             // bolus requested
             aapsLogger.error("deliverTreatment: Invalid input: neither carbs nor insulin are set in treatment")
-            return PumpEnactResult(injector).success(false).enacted(false).bolusDelivered(0.0).comment("Invalid input")
+            return instantiator.providePumpEnactResult().success(false).enacted(false).bolusDelivered(0.0).comment("Invalid input")
         }
-        val maxBolus = sp.getDouble(R.string.key_equil_maxbolus, 10.0)
-        if (detailedBolusInfo.insulin > maxBolus) {
+        val maxBolus = preferences.get(DoubleKey.EquilMaxBolus)
+        if (detailedBolusInfo.insulin > preferences.get(DoubleKey.EquilMaxBolus)) {
             val formattedValue = "%.2f".format(maxBolus)
             val comment = rh.gs(R.string.equil_maxbolus_tips, formattedValue)
-            return PumpEnactResult(injector).success(false).enacted(false).bolusDelivered(0.0).comment(comment)
+            return instantiator.providePumpEnactResult().success(false).enacted(false).bolusDelivered(0.0).comment(comment)
 
         }
         val mode = equilManager.runMode
         if (mode !== RunMode.RUN) {
-            return PumpEnactResult(injector).enacted(false).success(false).bolusDelivered(0.0).comment(rh.gs(R.string.equil_pump_not_run))
+            return instantiator.providePumpEnactResult().enacted(false).success(false).bolusDelivered(0.0).comment(rh.gs(R.string.equil_pump_not_run))
         }
         val lastInsulin = equilManager.currentInsulin
         return if (detailedBolusInfo.insulin > lastInsulin) {
-            PumpEnactResult(injector).success(false).enacted(false).bolusDelivered(0.0).comment(R.string.equil_not_enough_insulin)
+            instantiator.providePumpEnactResult().success(false).enacted(false).bolusDelivered(0.0).comment(R.string.equil_not_enough_insulin)
         } else deliverBolus(detailedBolusInfo)
     }
 
@@ -224,13 +229,13 @@ import javax.inject.Singleton
     ): PumpEnactResult {
         aapsLogger.debug(LTag.PUMPCOMM, "setTempBasalAbsolute=====$absoluteRate====$durationInMinutes===$enforceNew")
         if (durationInMinutes <= 0 || durationInMinutes % BASAL_STEP_DURATION.standardMinutes != 0L) {
-            return PumpEnactResult(injector).success(false).comment(rh.gs(R.string.equil_error_set_temp_basal_failed_validation, BASAL_STEP_DURATION.standardMinutes))
+            return instantiator.providePumpEnactResult().success(false).comment(rh.gs(R.string.equil_error_set_temp_basal_failed_validation, BASAL_STEP_DURATION.standardMinutes))
         }
         val mode = equilManager.runMode
         if (mode !== RunMode.RUN) {
-            return PumpEnactResult(injector).enacted(false).success(false).comment(rh.gs(R.string.equil_pump_not_run))
+            return instantiator.providePumpEnactResult().enacted(false).success(false).comment(rh.gs(R.string.equil_pump_not_run))
         }
-        var pumpEnactResult = PumpEnactResult(injector)
+        var pumpEnactResult = instantiator.providePumpEnactResult()
         pumpEnactResult.success(false)
         pumpEnactResult = equilManager.tempBasalPump
         if (pumpEnactResult.success) {
@@ -391,7 +396,7 @@ import javax.inject.Singleton
 
     override fun loadTDDs(): PumpEnactResult {
         aapsLogger.debug(LTag.PUMPCOMM, "loadTDDs")
-        return PumpEnactResult(injector).success(false).enacted(false)
+        return instantiator.providePumpEnactResult().success(false).enacted(false)
     }
 
     override fun isBatteryChangeLoggingEnabled(): Boolean = false
