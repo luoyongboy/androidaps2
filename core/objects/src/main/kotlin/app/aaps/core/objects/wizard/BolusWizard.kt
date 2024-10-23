@@ -36,11 +36,12 @@ import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventRefreshOverview
 import app.aaps.core.interfaces.sharedPreferences.SP
+import app.aaps.core.interfaces.smsCommunicator.Sms
+import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.Round
-import app.aaps.core.interfaces.utils.SafeParse
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.Preferences
 import app.aaps.core.keys.StringKey
@@ -53,8 +54,6 @@ import app.aaps.core.ui.dialogs.OKDialog
 import app.aaps.core.utils.HtmlHelper
 import app.aaps.core.utils.JsonHelper
 import dagger.android.HasAndroidInjector
-import app.aaps.core.interfaces.smsCommunicator.Sms
-import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
 import java.util.Calendar
 import java.util.LinkedList
 import javax.inject.Inject
@@ -377,8 +376,8 @@ class BolusWizard @Inject constructor(
                     .formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor)
             )
         if (config.NSCLIENT && insulinAfterConstraints > 0)
-            if(config.NSCLIENT && !phoneNumber.isNullOrBlank())
-                actions.add((rh.gs(app.aaps.core.ui.R.string.sms_bolus_notification)+"bolusWizard.kt").formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor))
+            if (!phoneNumber.isNullOrBlank())
+                actions.add(rh.gs(app.aaps.core.ui.R.string.sms_bolus_notification).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor))
             else
                 actions.add(rh.gs(app.aaps.core.ui.R.string.bolus_recorded_only).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor))
         if (useAlarm && !advisor && carbs > 0 && carbTime > 0)
@@ -547,7 +546,7 @@ class BolusWizard @Inject constructor(
                                 ValueWithUnit.Minute(carbTime).takeIf { carbTime != 0 })
                         )
                         var phoneNumber = preferences.get(StringKey.SmsReceiverNumber)
-                        if (config.NSCLIENT && !phoneNumber.isNullOrBlank()) {
+                        if (!phoneNumber.isNullOrBlank()) {
                             rh.gs(app.aaps.core.ui.R.string.sms_bolus_notification).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor)
                             smsCommunicator.sendSMS(Sms(phoneNumber, rh.gs(app.aaps.core.ui.R.string.bolus) + " " + insulin))
                         } else if (!config.APS)
@@ -559,9 +558,7 @@ class BolusWizard @Inject constructor(
                                 }
                             })
                     }
-                    bolusCalculatorResult?.let {
-                        persistenceLayer.insertOrUpdateBolusCalculatorResult(it).blockingGet()
-                    }
+                    bolusCalculatorResult?.let { persistenceLayer.insertOrUpdateBolusCalculatorResult(it).blockingGet() }
                 }
                 if (useAlarm && carbs > 0 && carbTime > 0) {
                     automation.scheduleTimeToEatReminder(T.mins(carbTime.toLong()).secs().toInt())
