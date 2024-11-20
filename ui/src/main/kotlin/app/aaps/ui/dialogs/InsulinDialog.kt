@@ -30,11 +30,15 @@ import app.aaps.core.interfaces.pump.defs.determineCorrectBolusStepSize
 import app.aaps.core.interfaces.queue.Callback
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.resources.ResourceHelper
+import app.aaps.core.interfaces.smsCommunicator.Sms
+import app.aaps.core.interfaces.smsCommunicator.SmsCommunicator
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DecimalFormatter
 import app.aaps.core.interfaces.utils.SafeParse
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
+import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.core.objects.extensions.formatColor
@@ -58,6 +62,7 @@ import kotlin.math.max
 
 class InsulinDialog : DialogFragmentWithDate() {
 
+    @Inject lateinit var smsCommunicator: SmsCommunicator
     @Inject lateinit var constraintChecker: ConstraintsChecker
     @Inject lateinit var rh: ResourceHelper
     @Inject lateinit var profileFunction: ProfileFunction
@@ -125,8 +130,10 @@ class InsulinDialog : DialogFragmentWithDate() {
 
         val pump = activePlugin.activePump
         if (config.NSCLIENT) {
-            binding.recordOnly.isChecked = true
-            binding.recordOnly.isEnabled = false
+            // If SmsAllowRemoteCommands is True, then user might use either SMS command or record only, otherwise hardcode record_only option
+            val allowSms = preferences.get(BooleanKey.SmsAllowRemoteCommands)
+            binding.recordOnly.isEnabled = allowSms
+            binding.recordOnly.isChecked = preferences.get(StringKey.SmsReceiverNumber).isNullOrBlank()
         }
         val maxInsulin = constraintChecker.getMaxBolusAllowed().value()
 
@@ -197,6 +204,7 @@ class InsulinDialog : DialogFragmentWithDate() {
         val actions: LinkedList<String?> = LinkedList()
         val units = profileFunction.getUnits()
         val unitLabel = if (units == GlucoseUnit.MMOL) rh.gs(app.aaps.core.ui.R.string.mmol) else rh.gs(app.aaps.core.ui.R.string.mgdl)
+        val phoneNumber = preferences.get(StringKey.SmsReceiverNumber)
         val recordOnlyChecked = binding.recordOnly.isChecked
         val eatingSoonChecked = binding.startEatingSoonTt.isChecked
 
@@ -207,6 +215,9 @@ class InsulinDialog : DialogFragmentWithDate() {
             )
             if (recordOnlyChecked)
                 actions.add(rh.gs(app.aaps.core.ui.R.string.bolus_recorded_only).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor))
+            else if (preferences.get(BooleanKey.SmsAllowRemoteCommands) && !phoneNumber.isNullOrBlank())
+                actions.add(rh.gs(app.aaps.core.ui.R.string.sms_bolus_notification).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor))
+
             if (abs(insulinAfterConstraints - insulin) > pumpDescription.pumpType.determineCorrectBolusStepSize(insulinAfterConstraints))
                 actions.add(
                     rh.gs(app.aaps.core.ui.R.string.bolus_constraint_applied_warn, insulin, insulinAfterConstraints).formatColor(context, rh, app.aaps.core.ui.R.attr.warningColor)
@@ -269,6 +280,8 @@ class InsulinDialog : DialogFragmentWithDate() {
                             ).subscribe()
                             if (timeOffset == 0)
                                 automation.removeAutomationEventBolusReminder()
+                        } else if (preferences.get(BooleanKey.SmsAllowRemoteCommands) && !phoneNumber.isNullOrBlank()) {
+                            smsCommunicator.sendSMS(Sms(phoneNumber, rh.gs(app.aaps.core.ui.R.string.bolus) + " " + detailedBolusInfo.insulin))
                         } else {
                             uel.log(
                                 Action.BOLUS, Sources.InsulinDialog,
