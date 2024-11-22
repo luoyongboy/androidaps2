@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main  # 当推送到 main 分支时触发
-  pull_request: # 当创建或更新 Pull Request 时触发
-  workflow_dispatch:  # 添加支持手动触发
+  pull_request:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
-        java-version: '11' # Android Studio 使用 Java 11
+        java-version: '17' # 修改为 Java 17，满足要求
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v2
@@ -40,4 +40,3 @@ jobs:
       with:
         name: AndroidAPS-APK
         path: app/build/outputs/apk/release/*.apk
-
