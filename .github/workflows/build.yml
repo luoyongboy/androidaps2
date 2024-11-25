@@ -3,9 +3,9 @@ name: Build AndroidAPS APK
 on:
   push:
     branches:
-      - main
+      - main  # 当推送到 main 分支时触发
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   build:
@@ -23,9 +23,11 @@ jobs:
         java-version: '17'
 
     - name: Setup Android SDK
-      run: |
-        echo "Installing Android SDK..."
-        sdkmanager --install "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
+      uses: android-actions/setup-android@v2
+      with:
+        api-level: 33
+        build-tools: 33.0.2
+        ndk: 23.1.7779620
 
     - name: Grant execute permission
       run: chmod +x ./gradlew
@@ -33,8 +35,13 @@ jobs:
     - name: Build APK
       run: ./gradlew assembleRelease
 
+    - name: Debug APK path
+      run: |
+        echo "Listing APK files:"
+        find ./ -name "*.apk"
+
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v3
       with:
         name: AndroidAPS-APK
-        path: app/build/outputs/apk/release/app-release.apk
+        path: "**/outputs/apk/**/*.apk"
