@@ -3,9 +3,9 @@ name: Build AndroidAPS APK
 on:
   push:
     branches:
-      - main  # 当推送到 main 分支时触发
+      - main
   pull_request:
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -20,14 +20,12 @@ jobs:
       uses: actions/setup-java@v3
       with:
         distribution: 'zulu'
-        java-version: '17' # 修改为 Java 17，满足要求
+        java-version: '17'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
-      with:
-        api-level: 33         # 根据项目需求设置 API Level
-        build-tools: 33.0.2   # 指定使用的 Build Tools 版本
-        ndk: 23.1.7779620     # 如果需要 NDK，可以指定版本
+      run: |
+        echo "Installing Android SDK..."
+        sdkmanager --install "platforms;android-33" "build-tools;33.0.2" "ndk;23.1.7779620"
 
     - name: Grant execute permission
       run: chmod +x ./gradlew
@@ -39,4 +37,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: AndroidAPS-APK
-        path: app/build/outputs/apk/release/*.apk
+        path: app/build/outputs/apk/release/app-release.apk
